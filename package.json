@@ -1,0 +1,15 @@
+{
+  "name": "iou",
+  "version": "1.0.0",
+  "description": "I Owe You",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+  "author": "Michael Ziccarelli",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.16.3"
+  }
+}
