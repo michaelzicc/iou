@@ -18,6 +18,10 @@ app.get('/app.js', (req, res) => {
 	res.sendFile(__dirname + "/home/scripts/app.js");
 });
 
+app.get('/index.js', (req, res) => {
+	res.sendFile(__dirname + "/home/scripts/index.js");
+});
+
 app.get('/ious.js', (req, res) => {
 	res.sendFile(__dirname + "/home/scripts/ious.js");
 });
@@ -37,13 +41,14 @@ app.use(bodyParser.urlencoded({
 app.use(bodyParser.json());
 
 function decodeUid(token, callback) {
-	return new Promise(function() {
+	return new Promise((resolve, reject) => {
 		firebaseAdmin.admin.auth().verifyIdToken(token)
 			.then(function(decodedToken) {
-				callback(decodedToken.uid);
+				resolve(callback(decodedToken.uid));
 			}).catch(function(error) {
 				console.log(error);
-		});
+				reject(new Error("Could not decode Token."));
+			});
 	});
 }
 
@@ -83,6 +88,10 @@ app.post('/getIOUs', function(req, res) {
 				res.json([payeeQuery, payerQuery]);
 			});
 		});
+	}).catch(function(error) {
+		console.log(error);
+		res.redirect("/error");
+		return;
 	});
 });
 
@@ -158,6 +167,8 @@ app.post('/newIOU', function(req, res) {
 		res.redirect("/");
 	}).catch(function(error) {
 		console.log(error);
+		res.redirect("/error");
+		return;
 	});
 });
 

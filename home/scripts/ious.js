@@ -12,6 +12,7 @@ app.controller('iouCtrl', function($scope) {
 				var section = document.getElementById("ious");
 				$scope.ious = angular.fromJson(xhr.responseText);
 				console.log(xhr.responseText);
+				$scope.$digest();
 			}
 		}
 		xhr.open("POST", "/getIOUs", true);
@@ -20,3 +21,28 @@ app.controller('iouCtrl', function($scope) {
 		
 	}
 });
+
+function mainApp(user)
+{
+	console.log("mainApp()");
+	if(!user)
+	{
+		console.log("Empty User");
+		document.getElementById("clientName").innerHTML = "";
+		return;
+	}
+	//afterLogin();
+	document.getElementById("clientName").innerHTML = user.displayName;
+	console.log("user.email: " +user.email);
+	//var token = document.getElementById("token");
+	firebase.auth().currentUser.getIdToken(true)
+		.then(function(idToken){
+			//token.value = idToken;
+			var scope = angular.element(document.getElementById("iouAApp")).scope();
+			scope.$apply(function () {
+				scope.getIOUs();
+			});
+		}).catch(function(error) {
+			console.log("error getting token");
+		});
+}
