@@ -14,6 +14,14 @@ app.get('/myious', (req, res) => {
 	res.sendFile(__dirname + "/home/ious.html");
 });
 
+app.get('/login', (req, res) => {
+	res.sendFile(__dirname + "/home/signIn.html");
+});
+
+app.get('/signup', (req, res) => {
+	res.sendFile(__dirname + "/home/signUp.html");
+});
+
 app.get('/app.js', (req, res) => {
 	res.sendFile(__dirname + "/home/scripts/app.js");
 });
@@ -24,6 +32,10 @@ app.get('/index.js', (req, res) => {
 
 app.get('/ious.js', (req, res) => {
 	res.sendFile(__dirname + "/home/scripts/ious.js");
+});
+
+app.get('/signUp.js', (req, res) => {
+	res.sendFile(__dirname + "/home/scripts/signUp.js");
 });
 
 app.get('/config.js', (req, res) => {
@@ -170,6 +182,34 @@ app.post('/newIOU', function(req, res) {
 		res.redirect("/error");
 		return;
 	});
+});
+
+app.post('/newAccount', function(req, res) {
+	console.log(req.body);
+	var username = req.body.username;
+	
+	if(username === undefined || username === null || username == '')
+	{
+		console.log("A username was not submitted");
+		res.redirect("/error");
+		return;
+	}
+	if(username.length < 6 || username.length > 50)
+	{
+		console.log("Username \"" + username + "\" does not meet the length requirements.");
+		res.redirect("/error");
+		return;
+	}
+	var isAlphaNumeric = /(^[A-Za-z0-9]+$)/.test(username);
+	if(!isAlphaNumeric)
+	{
+		console.log("Username \"" + username + "\" does not meet the character requirements.");
+		res.redirect("/error");
+		return;
+	}
+	
+	res.redirect("/");
+	
 });
 
 //How do I validate this is legit?
