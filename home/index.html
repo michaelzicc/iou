@@ -1,45 +1,48 @@
-<html>
+<html ng-app="iouApp" ng-controller="iouCtrl" id="iouAApp">
 	<head>
 		<title>Testing</title>
+		<script src="angular.js"></script>
 	</head>
 	<body>
 
-		<span id="SignUp">Sign Up</span>
-		<span id="LogIn">Log In</span>
-		<span id="LogOut">Log Out</span>
+		<a href="signUp" id="SignUp" ng-if="!loggedIn">Sign Up</a>
+		<span id="LogIn" ng-if="!loggedIn">Log In</span>
+		<span id="LogOut" ng-if="loggedIn">Log Out</span>
 
-		<br />
-		
-		Hello <span id="clientName"></span>
-		
-		<br />
+		<div ng-if="loggedIn">
+			<br />
+			
+			Hello <span id="clientName"></span>
+			
+			<br />
 
-		<form method="post" action="/newIOU">
-			<select name="action" id="Selection" onchange="updateForm()" required>
-				<option value="iou" selected>I Owe</option>
-				<option value="uoi">I'm Owed</option>
-			</select>
-			
-			<input name="amount" id="Amount" type="number" value="5.00" step="0.01" required>
-			
-			<span id="Direction">to</span>
-			
-			<select name="contacts" id="Contacts" multiple required>
-				<option>Test1</option>
-				<option>Test2</option>
-				<option>Test3</option>
-				<option>Test45</option>
-				<option>Test6</option>
-				<option>Test7</option>
-			</select>
-			
-			for
-			
-			<textarea name="reason" required>Testing</textarea>
-			
-			<input name="token" id="token" readonly required type="hidden">
-			<input type="submit">
-		</form>
+			<form method="post" action="/newIOU">
+				<select name="action" id="Selection" onchange="updateForm()" required>
+					<option value="iou" selected>I Owe</option>
+					<option value="uoi">I'm Owed</option>
+				</select>
+				
+				<input name="amount" id="Amount" type="number" value="5.00" step="0.01" required>
+				
+				<span id="Direction">to</span>
+				
+				<select name="contacts" id="Contacts" multiple required>
+					<option>Test1</option>
+					<option>Test2</option>
+					<option>Test3</option>
+					<option>Test45</option>
+					<option>Test6</option>
+					<option>Test7</option>
+				</select>
+				
+				for
+				
+				<textarea name="reason" required>Testing</textarea>
+				
+				<input name="token" id="token" readonly required type="hidden">
+				<input type="submit">
+			</form>
+		</div>
 		
 	</body>
 	<script src="config.js"></script>

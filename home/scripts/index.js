@@ -1,3 +1,24 @@
+var app = angular.module('iouApp', []);
+var cf;
+var cfLoggedIn = false;
+
+app.controller('iouCtrl', function($scope) {
+	cf = this;
+	
+	$scope.loggedIn = false;
+	
+	cf.setLoginStatus = function (status)
+	{
+		$scope.loggedIn = status;
+		cfLoggedIn = status;
+		console.log("Get Login Status " + status);		
+		$scope.$apply();
+		setActionHandlers();
+	}
+});
+
+
+
 function mainApp(user)
 {
 	console.log("mainApp()");
@@ -5,11 +26,13 @@ function mainApp(user)
 	if(!user)
 	{
 		console.log("Empty User");
-		document.getElementById("clientName").innerHTML = "";
+		//document.getElementById("clientName").innerHTML = "";
 		return;
 	}
 	//afterLogin();
 	console.log("User.");
+	console.log("try set login status");
+	cf.setLoginStatus(true);
 	document.getElementById("clientName").innerHTML = user.displayName;
 	console.log("user.uid: " +user.uid);
 	console.log("user.email: " +user.email);
@@ -40,16 +63,18 @@ function updateForm()
 }
 
 function setActionHandlers() {
-		
-	var loginButton = document.getElementById("LogIn");
-	loginButton.onclick = function(){ login() };
+	
+	if(!cfLoggedIn)
+	{
+		var loginButton = document.getElementById("LogIn");
+		loginButton.onclick = function(){ login() };
+	}
+	else
+	{
+		var logOutButton = document.getElementById("LogOut");
+		logOutButton.onclick = function(){ logOut() };
 
-	var signUpButton = document.getElementById("SignUp");
-	signUpButton.onclick = function(){ signUp() };
-
-	var logOutButton = document.getElementById("LogOut");
-	logOutButton.onclick = function(){ logOut() };
-
-	var selection = document.getElementById("Selection");
-	selection.onchange = function(){ updateForm() };
+		var selection = document.getElementById("Selection");
+		selection.onchange = function(){ updateForm() };
+	}
 }
