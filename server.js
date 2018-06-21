@@ -328,37 +328,53 @@ app.post('/newAccount', function(req, res) {
 		
 		console.log("Username met requirements");
 		
-		doesUsernameExist(username, function(usernameExists)
+		doesUsernameExistForUser(req.body.token, function(userHasUsername)
 		{
-			if(usernameExists)
+			if(userHasUsername)
 			{
-				res.status(400);
-				console.log("Sending 'Username Already Exists'");
-				res.send("Username Already Exists");
+				res.status(300);
+				console.log("Redirect to Home Page");
+				res.redirect("/");
 				return;
 			}
-			_this = this;
-			var email = "";
-			firebaseAdmin.admin.auth().getUser(userId).then(function(userRecord){
-				console.log("Successfully fetched user data:", userRecord.toJSON());
-				_this.email = userRecord.email;
-				var docRef = db.collection('users').doc();
-				var setDoc = docRef.set({
-				//console.log(JSON.stringify({
-					Username: username,
-					DateCreated: firebaseAdmin.FieldValue.serverTimestamp(),
-					Uid: userId,
-					Email: _this.email
-				//}));
+			else 
+			{
+				doesUsernameExist(username, function(usernameExists)
+				{
+					if(usernameExists)
+					{
+						res.status(400);
+						console.log("Sending 'Username Already Exists'");
+						res.send("Username Already Exists");
+						return;
+					}
+					else
+					{
+						_this = this;
+						var email = "";
+						firebaseAdmin.admin.auth().getUser(userId).then(function(userRecord){
+							console.log("Successfully fetched user data:", userRecord.toJSON());
+							_this.email = userRecord.email;
+							var docRef = db.collection('users').doc();
+							var setDoc = docRef.set({
+							//console.log(JSON.stringify({
+								Username: username,
+								DateCreated: firebaseAdmin.FieldValue.serverTimestamp(),
+								Uid: userId,
+								Email: _this.email
+							//}));
+							});
+						res.status(300);
+						console.log("Redirect to Home Page");
+						res.redirect("/");
+						}).catch(function(error) {
+							res.status(400);
+							console.log("Error fetching user data: ", error)
+							res.send("An error occurred. Please try again.");
+						});
+					}
 				});
-			res.status(300);
-			console.log("Redirect to Home Page");
-			res.redirect("/");
-			}).catch(function(error) {
-				res.status(400);
-				console.log("Error fetching user data: ", error)
-				res.send("An error occurred. Please try again.");
-			});
+			}
 		});
 	}).catch(function(error) {
 		console.log(error);
