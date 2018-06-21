@@ -3,19 +3,15 @@
 		<title>Sign In or Sign Up</title>
 	</head>
 	<body>
-
-		<span id="LogIn">Log In Instead</span>
-
-		<br />
-		
-		<form method="post" action="/newAccount">
+		<form method="POST" action="/newAccount" onsubmit="return submitForm()" id="CreateUsernameForm">
 			
 			Choose a username<br />
 			<small>Usernames must be between 6 and 50 characters long and contain only letters and numbers</small>
 			<br />
 			<input name="username" id="Username" type="text" pattern="([A-Za-z0-9]){6,50}" title="Usernames must be between 6 and 50 characters long and contain only letters and numbers" required>
-			
-			<input type="submit">
+			<div id="errorMessage"></div>
+			<input name="token" id="token" readonly required type="hidden">
+			<button type="submit">Submit Form</button>
 		</form>
 		
 	</body>

@@ -15,6 +15,7 @@ function signUp()
 
 function login()
 {
+	console.log('app.js - login()');
 	var provider = new firebase.auth.GoogleAuthProvider();
 	provider.addScope('https://www.googleapis.com/auth/contacts.readonly');
 	firebase.auth().useDeviceLanguage();
@@ -57,6 +58,7 @@ function logOut()
 {
 	firebase.auth().signOut().then(function() {
 		console.log("Log out successful");
+		location.reload();
 	// Sign-out successful.
 	}).catch(function(error) {
 				// Handle Errors here.
