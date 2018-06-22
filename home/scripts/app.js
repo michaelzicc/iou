@@ -8,19 +8,6 @@
 		
 }());
 
-function signUp()
-{
-	login();
-}
-
-function login()
-{
-	var provider = new firebase.auth.GoogleAuthProvider();
-	provider.addScope('https://www.googleapis.com/auth/contacts.readonly');
-	firebase.auth().useDeviceLanguage();
-	firebase.auth().signInWithRedirect(provider);
-}
-
 function afterLogin(user)
 {
 	console.log("authstate changed");
@@ -51,23 +38,6 @@ function afterLogin(user)
 		// // ...
 	// });	
 	// console.log("outside then");
-}
-
-function logOut()
-{
-	firebase.auth().signOut().then(function() {
-		console.log("Log out successful");
-	// Sign-out successful.
-	}).catch(function(error) {
-				// Handle Errors here.
-		var errorCode = error.code;
-		var errorMessage = error.message;
-		// The email of the user's account used.
-		var email = error.email;
-		// The firebase.auth.AuthCredential type that was used.
-		var credential = error.credential;
-		// ...
-	});
 }
 
 function updateUser()
