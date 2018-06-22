@@ -114,6 +114,27 @@ function iouQuery(coll, key1, key2, uid, callback) {
 	});
 }
 
+function getUserIdFromUsername(username, callback)
+{
+	var userId = false;
+	
+	var docRef = db.collection('users');
+	var query = docRef.where('Username', '==', username).get().then(
+		snapshot => {
+			snapshot.forEach(doc => {
+				console.log("User Data: ");
+				console.log(doc.data());
+				userId = doc.data().Uid;
+			});
+			console.log("username exists: " + userId);
+			callback(userId);
+		})
+		.catch(err => {
+			console.log('Error getting documents', err);
+			callback(false);
+		});
+}
+
 function doesUsernameExist(username, callback)
 {
 	var exists = false;
@@ -381,9 +402,9 @@ app.post('/newAccount', function(req, res) {
 								Email: _this.email
 							//}));
 							});
-						res.status(300);
-						console.log("Redirect to Home Page");
-						res.redirect("/");
+							res.status(300);
+							console.log("Redirect to Home Page");
+							res.redirect("/");
 						}).catch(function(error) {
 							res.status(400);
 							console.log("Error fetching user data: ", error)
@@ -398,6 +419,69 @@ app.post('/newAccount', function(req, res) {
 		res.status(400);
 		res.send("An error occurred. Please try again.");
 		return;
+	});
+});
+
+app.post('/search', function(req, res) {
+	console.log("POST: /search");
+	console.log(req.body);
+	
+	if(req.body.token === undefined)
+	{
+		console.log("Token is Undefined");
+		console.log("Redirect to Error Page");
+		res.send("An error occurred while processing your request");
+		return;
+	}
+	username = req.body.username;
+	
+	doesUsernameExist(username, function(usernameExists)
+	{
+		if(usernameExists)
+		{
+			res.status(200);
+			console.log("Sending Username Connection Option");
+			res.send("Username Found!<br><button type=\"button\" id=\"connectButton\" onclick=\"connect()\">Connect with " + username + "</button>");
+			return;
+		}
+		else
+		{
+			res.status(404);
+			console.log("Username not Found");
+			res.send("An account with that username was not found.");
+		}
+	});
+});
+
+app.post('/connect', function(req, res) {
+	console.log("POST: /connect");
+	console.log(req.body);
+	
+	if(req.body.token === undefined)
+	{
+		console.log("Token is Undefined");
+		console.log("Redirect to Error Page");
+		res.send("An error occurred while processing your request");
+		return;
+	}
+	username = req.body.username;
+	
+	getUserIdFromUsername(username, function(userId)
+	{
+		if(userId)
+		{
+			res.status(200);
+			console.log("Connecting Users");
+			//TODO: Connect Users
+			res.send("Sent Connection Request");
+			return;
+		}
+		else
+		{
+			res.status(404);
+			console.log("Username not Found");
+			res.send("An account with that username was not found.");
+		}
 	});
 });
 
