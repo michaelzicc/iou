@@ -6,8 +6,8 @@
 	<body>
 
 		<a href="signUp" id="SignUp" ng-if="!loggedIn">Sign Up</a>
-		<span id="LogIn" ng-if="!loggedIn">Log In</span>
-		<span id="LogOut" ng-if="loggedIn">Log Out</span>
+		<a href="login" id="LogIn" ng-if="!loggedIn">Log In</a>
+		<a href="logOut" id="LogOut" ng-if="loggedIn">Log Out</a>
 
 		<div ng-if="loggedIn">
 			<br />
@@ -49,4 +49,5 @@
 	<script src="https://www.gstatic.com/firebasejs/4.12.1/firebase.js"></script>
 	<script src="app.js"></script>
 	<script src="index.js"></script>
+	<script src="search.js"></script>
 </html>

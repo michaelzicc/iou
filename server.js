@@ -21,6 +21,11 @@ app.get('/login', (req, res) => {
 	res.sendFile(__dirname + "/home/signIn.html");
 });
 
+app.get('/logOut', (req, res) => {
+	console.log("GET: /logOut");
+	res.sendFile(__dirname + "/home/logOut.html");
+});
+
 app.get('/signup', (req, res) => {
 	console.log("GET: /signup");
 	res.sendFile(__dirname + "/home/signUp.html");
@@ -44,6 +49,21 @@ app.get('/ious.js', (req, res) => {
 app.get('/signUp.js', (req, res) => {
 	console.log("GET: /signUp.js");
 	res.sendFile(__dirname + "/home/scripts/signUp.js");
+});
+
+app.get('/signIn.js', (req, res) => {
+	console.log("GET: /signIn.js");
+	res.sendFile(__dirname + "/home/scripts/signIn.js");
+});
+
+app.get('/logOut.js', (req, res) => {
+	console.log("GET: /logOut.js");
+	res.sendFile(__dirname + "/home/scripts/logOut.js");
+});
+
+app.get('/search.js', (req, res) => {
+	console.log("GET: /search.js");
+	res.sendFile(__dirname + "/home/scripts/search.js");
 });
 
 app.get('/config.js', (req, res) => {
@@ -280,9 +300,6 @@ app.post('/checkUser', function(req, res) {
 			res.send("false");
 		}
 	});
-	
-	
-	
 });
 
 app.post('/newAccount', function(req, res) {
@@ -382,7 +399,6 @@ app.post('/newAccount', function(req, res) {
 		res.send("An error occurred. Please try again.");
 		return;
 	});
-	
 });
 
 //How do I validate this is legit?

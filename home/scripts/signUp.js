@@ -18,6 +18,13 @@ function mainApp(user)
 		});
 }
 
+function login()
+{
+	var provider = new firebase.auth.GoogleAuthProvider();
+	provider.addScope('https://www.googleapis.com/auth/contacts.readonly');
+	firebase.auth().useDeviceLanguage();
+	firebase.auth().signInWithRedirect(provider);
+}
 
 function checkUser(idToken)
 {

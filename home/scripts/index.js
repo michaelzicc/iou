@@ -43,6 +43,7 @@ function mainApp(user)
 	firebase.auth().currentUser.getIdToken(true)
 		.then(function(idToken){
 			console.log("idToken: " + idToken); 
+			checkUser(idToken);
 			token.value = idToken;
 		}).catch(function(error) {
 			console.log("error getting token");
@@ -66,15 +67,35 @@ function setActionHandlers() {
 	
 	if(!cfLoggedIn)
 	{
-		var loginButton = document.getElementById("LogIn");
-		loginButton.onclick = function(){ login() };
+		return;
 	}
 	else
 	{
-		var logOutButton = document.getElementById("LogOut");
-		logOutButton.onclick = function(){ logOut() };
-
 		var selection = document.getElementById("Selection");
 		selection.onchange = function(){ updateForm() };
 	}
+}
+
+function checkUser(idToken)
+{
+	console.log("index.js - checkUser");
+	var data = JSON.stringify({ 
+		token: idToken
+	});
+	var xhr = new XMLHttpRequest();
+	xhr.onreadystatechange = function() {
+		if (xhr.readyState == XMLHttpRequest.DONE) {
+			if(xhr.responseText == "true")
+			{
+				return;
+			}
+			else
+			{
+				location.replace("/signUp");
+			}
+		}
+	}
+	xhr.open("POST", "/checkUser", true);
+	xhr.setRequestHeader("Content-Type", "application/json");
+	xhr.send(data);
 }
