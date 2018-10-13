@@ -6,6 +6,10 @@ var firebaseAdmin = require('./firebaseAdmin');
 
 var db = firebaseAdmin.admin.firestore();
 
+
+
+//Resources
+
 app.get('/', (req, res) => {
 	console.log("GET: /");
 	res.sendFile(__dirname + "/home/index.html");
@@ -82,6 +86,11 @@ app.use(bodyParser.urlencoded({
 
 app.use(bodyParser.json());
 
+
+
+
+//Functions
+
 function decodeUid(token, callback) {
 	return new Promise((resolve, reject) => {
 		firebaseAdmin.admin.auth().verifyIdToken(token)
@@ -114,6 +123,7 @@ function iouQuery(coll, key1, key2, uid, callback) {
 	});
 }
 
+//Checks if Username exists and then gets the associated UserId, otherwise, it returns false
 function getUserIdFromUsername(username, callback)
 {
 	var userId = false;
@@ -178,6 +188,94 @@ function doesUsernameExistForUser(token, callback)
 		callback(true);
 	});
 }
+
+function connectUsers(requesterUid, newConnectionUid, callback)
+{
+	if(requesterUid === newConnectionUid)
+	{
+		console.log("User trying to connect to themself");
+		console.log("Requester UID: " + requesterUid);
+		console.log("Connection UID: " + newConnectionUid);
+		callback("Cannot connect to yourself");
+		return;
+	}
+	var docRef = db.collection('connections');
+
+	docRef.where('RequesterUid', '==', requesterUid)
+		.where('ConnectionUid', '==', newConnectionUid).get().then(
+		snapshot => {
+			var response = "";
+			snapshot.forEach(doc => {
+				console.log("Connection already exists");
+				console.log(doc.data());
+				switch(doc.data().Status)
+				{
+					case "Pending":
+						console.log("The previous connection request is pending");
+						response = "The connection request is pending.";
+						break;
+					case "Confirmed":
+						console.log("The connection has confirmed the requester's request");
+						response = "You two are already connected.";
+						break;
+					case "Rejected":
+						console.log("The connection has rejected the requester's request");
+						var ninetyDaysAgo = new Date(doc.data().UpdatedDate);
+						ninetyDaysAgo.setDate(ninetyDaysAgo.getDate()-90);
+						if(doc.data().UpdatedDate > ninetyDaysAgo)
+						{
+							response = "The connection request is pending.";
+						}
+						else
+						{
+							db.collection('connections').doc(doc.id).update({
+							//console.log(JSON.stringify({
+								Status: "Pending",
+								UpdatedDate: firebaseAdmin.FieldValue.serverTimestamp()
+							//}));
+							});
+							response = "Sent Connection Request!";
+						}
+						break;
+					case "Blocked":
+						console.log("The requester has blocked this connection");
+						response = "You have to unblock this user before requesting to connect.";
+						break;						
+					default:
+						response = "An unexpected error has occurred."
+						console.log("An unexpected error has occurred while getting the status of this connection: " + doc.data());
+						break;
+				}
+			});
+
+			if(response === "")
+			{
+				console.log("Creating connection...");
+				docRef.doc().set({
+				//console.log(JSON.stringify({
+					RequesterUid: requesterUid,
+					ConnectionUid: newConnectionUid,
+					Status: "Pending",
+					CreatedDate: firebaseAdmin.FieldValue.serverTimestamp(),
+					UpdatedDate: firebaseAdmin.FieldValue.serverTimestamp()
+				//}));
+				});
+				console.log("Connection created.");
+				response = "Sent Connection Request!";
+			}
+
+
+			console.log("Connection Response: " + response);
+			callback(response);
+		})
+		.catch(err => {
+			console.log('Error getting connection', err);
+		});
+}
+
+
+
+//API Endpoints
 
 app.post('/getIOUs', function(req, res) {
 	console.log("POST: /getIOUs");
@@ -261,7 +359,7 @@ app.post('/newIOU', function(req, res) {
 			return;
 		}
 		
-		email = FirebaseAuth
+		//email = FirebaseAuth
 		
 		payer.forEach(function sendDocs(cPayer, cPayerIndex) {
 			payee.forEach(function sendThem(cPayee, cPayeeIndex) {
@@ -433,23 +531,32 @@ app.post('/search', function(req, res) {
 		res.send("An error occurred while processing your request");
 		return;
 	}
-	username = req.body.username;
-	
-	doesUsernameExist(username, function(usernameExists)
+	decodeUid(req.body.token, function(uid)
 	{
-		if(usernameExists)
+		console.log("Searcher's UID: " + uid);
+		username = req.body.username;
+		
+		doesUsernameExist(username, function(usernameExists)
 		{
-			res.status(200);
-			console.log("Sending Username Connection Option");
-			res.send("Username Found!<br><button type=\"button\" id=\"connectButton\" onclick=\"connect()\">Connect with " + username + "</button>");
-			return;
-		}
-		else
-		{
-			res.status(404);
-			console.log("Username not Found");
-			res.send("An account with that username was not found.");
-		}
+			if(usernameExists)
+			{
+				res.status(200);
+				console.log("Sending Username Connection Option");
+				res.send("Username Found!<br><button type=\"button\" id=\"connectButton\" onclick=\"connect()\">Connect with " + username + "</button>");
+				return;
+			}
+			else
+			{
+				res.status(404);
+				console.log("Username not Found");
+				res.send("An account with that username was not found.");
+			}
+		});
+	}).catch(function(error) {
+		console.log(error);
+		console.log("Token is bad");
+		console.log("Redirect to Error Page");
+		res.send("An error occurred while processing your request");
 	});
 });
 
@@ -464,24 +571,38 @@ app.post('/connect', function(req, res) {
 		res.send("An error occurred while processing your request");
 		return;
 	}
-	username = req.body.username;
-	
-	getUserIdFromUsername(username, function(userId)
+
+	decodeUid(req.body.token, function(requestersUid)
 	{
-		if(userId)
+		console.log("Requester's UID: " + requestersUid);
+		username = req.body.username;
+	
+		getUserIdFromUsername(username, function(newConnectionUid)
 		{
-			res.status(200);
-			console.log("Connecting Users");
-			//TODO: Connect Users
-			res.send("Sent Connection Request");
-			return;
-		}
-		else
-		{
-			res.status(404);
-			console.log("Username not Found");
-			res.send("An account with that username was not found.");
-		}
+			if(newConnectionUid)
+			{
+				res.status(200);
+				console.log("Connecting Users");
+				//TODO: Connect Users
+
+				connectUsers(requestersUid, newConnectionUid, function(connectResponse)
+				{
+					res.send(connectResponse);
+					return;
+				});
+			}
+			else
+			{
+				res.status(404);
+				console.log("Username not Found");
+				res.send("An account with that username was not found.");
+			}
+		});
+	}).catch(function(error) {
+		console.log(error);
+		console.log("Token is bad");
+		console.log("Redirect to Error Page");
+		res.send("An error occurred while processing your request");
 	});
 });
 
@@ -501,6 +622,6 @@ app.use(function (req, res) {
 	res.status(404).sendFile(__dirname + "/home/error.html");
 });
 
-app.listen(8000, () => {
-	console.log("server started on port 8000")
+app.listen(4201, () => {
+	console.log("server started on port 4201")
 });

@@ -1,4 +1,4 @@
-var checkedName;
+var CheckedName;
 
 function search()
 {
@@ -23,7 +23,7 @@ function search()
 			if(xhr.status == 404 || xhr.status == 200)
 			{
 				document.getElementById("searchResults").innerHTML = xhr.responseText;
-				checkedName = username;
+				CheckedName = username;
 			}
 			else
 			{
@@ -40,7 +40,7 @@ function search()
 function connect()
 {
 	console.log("search.js - connect");
-	var username = checkedName;
+	var username = CheckedName;
 	var idToken = document.getElementById("token").value;
 	console.log("username");
 	console.log(username);
