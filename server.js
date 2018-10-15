@@ -50,6 +50,11 @@ app.get('/ious.js', (req, res) => {
 	res.sendFile(__dirname + "/home/scripts/ious.js");
 });
 
+app.get('/notifications.js', (req, res) => {
+	console.log("GET: /notifications.js");
+	res.sendFile(__dirname + "/home/scripts/notifications.js");
+});
+
 app.get('/signUp.js', (req, res) => {
 	console.log("GET: /signUp.js");
 	res.sendFile(__dirname + "/home/scripts/signUp.js");
@@ -145,6 +150,28 @@ function getUserIdFromUsername(username, callback)
 		});
 }
 
+//Checks if UID exists and then gets the associated username, otherwise, it returns false
+function getUsernameFromUid(uid, callback)
+{
+	var username = false;
+	
+	var docRef = db.collection('users');
+	docRef.where('Uid', '==', uid).get().then(
+		snapshot => {
+			snapshot.forEach(doc => {
+				console.log("User Data: ");
+				console.log(doc.data());
+				username = doc.data().Username;
+			});
+			console.log("username exists: " + username);
+			callback(username);
+		})
+		.catch(err => {
+			console.log('Error getting documents', err);
+			callback(false);
+		});
+}
+
 function doesUsernameExist(username, callback)
 {
 	var exists = false;
@@ -191,6 +218,9 @@ function doesUsernameExistForUser(token, callback)
 
 function connectUsers(requesterUid, newConnectionUid, callback)
 {
+	var oppositeConnectionExists = false;
+	var newConnectionHasBeenBlocked = false;
+	var response = "";
 	if(requesterUid === newConnectionUid)
 	{
 		console.log("User trying to connect to themself");
@@ -200,46 +230,199 @@ function connectUsers(requesterUid, newConnectionUid, callback)
 		return;
 	}
 	var docRef = db.collection('connections');
+	
+	//Check if the newConnection user has blocked the requester
+	console.log("Checking if requester has been blocked by the wanted connection");
+	docRef.where('RequesterUid', '==', newConnectionUid)
+		.where('ConnectionUid', '==', requesterUid)
+		.where('Status', '==', 'Blocked').get().then(
+		snapshot => {
+			snapshot.forEach(doc => {
+				console.log("The requester has been blocked by the wanted connection.")
+				response = "Unable to connect with user";
+				newConnectionHasBeenBlocked = true;
+			});
+		});
+
+	if(newConnectionHasBeenBlocked)
+	{
+		callback(response);
+		return;
+	}
+
+	//Check if opposite connection exists before sending a new request
+	docRef.where('RequesterUid', '==', newConnectionUid)
+		.where('ConnectionUid', '==', requesterUid).get().then(
+			snapshot => {
+				snapshot.forEach(doc => {
+					if(doc.Status == "Rejected")
+					{
+						console.log("Opposite connection already exists, but is rejected");
+						return;
+					}
+					else
+					{
+						console.log("Opposite connection already exists");
+						confirmConnection(newConnectionUid, requesterUid, function(confirmationResult)
+						{
+							response = confirmationResult;
+						})
+						oppositeConnectionExists = true;
+					}
+				});
+			});
+
+	if(!oppositeConnectionExists)
+	{
+		docRef.where('RequesterUid', '==', requesterUid)
+			.where('ConnectionUid', '==', newConnectionUid).get().then(
+			snapshot => {
+				snapshot.forEach(doc => {
+					console.log("Connection already exists");
+					console.log(doc.data());
+					switch(doc.data().Status)
+					{
+						case "Pending":
+							console.log("The previous connection request is pending");
+							response = "The connection request is pending.";
+							break;
+						case "Confirmed":
+							console.log("The connection has confirmed the requester's request");
+							response = "You two are already connected.";
+							break;
+						case "Rejected":
+							console.log("The connection has rejected the requester's request");
+							var ninetyDaysAgo = new Date(doc.data().UpdatedDate);
+							ninetyDaysAgo.setDate(ninetyDaysAgo.getDate()-90);
+							if(doc.data().UpdatedDate > ninetyDaysAgo)
+							{
+								response = "The connection request is pending.";
+							}
+							else
+							{
+								docRef.doc(doc.id).update({
+								//console.log(JSON.stringify({
+									Status: "Pending",
+									UpdatedDate: firebaseAdmin.FieldValue.serverTimestamp()
+								//}));
+								});
+								response = "Sent Connection Request!";
+							}
+							break;
+						case "Blocked":
+							console.log("The requester has blocked this connection");
+							response = "You have to unblock this user before requesting to connect.";
+							break;						
+						default:
+							response = "An unexpected error has occurred."
+							console.log("An unexpected error has occurred while getting the status of this connection: " + doc.data());
+							break;
+					}
+				});
+
+				if(response === "")
+				{
+					console.log("Creating connection...");
+					docRef.doc().set({
+					//console.log(JSON.stringify({
+						RequesterUid: requesterUid,
+						ConnectionUid: newConnectionUid,
+						Status: "Pending",
+						CreatedDate: firebaseAdmin.FieldValue.serverTimestamp(),
+						UpdatedDate: firebaseAdmin.FieldValue.serverTimestamp()
+					//}));
+					});
+					console.log("Connection created.");
+					response = "Sent Connection Request!";
+				}
+
+
+				console.log("Connection Response: " + response);
+				callback(response);
+			})
+			.catch(err => {
+				console.log('Error getting connection', err);
+			});
+	}
+}
+
+function confirmConnection(requesterUid, confirmerUid, callback)
+{
+	if(requesterUid === confirmerUid)
+	{
+		console.log("User trying to connect to themself");
+		console.log("Requester UID: " + requesterUid);
+		console.log("Connection UID: " + confirmerUid);
+		callback("Cannot connect to yourself");
+		return;
+	}
+	var docRef = db.collection('connections');
 
 	docRef.where('RequesterUid', '==', requesterUid)
-		.where('ConnectionUid', '==', newConnectionUid).get().then(
+		.where('ConnectionUid', '==', confirmerUid).get().then(
 		snapshot => {
 			var response = "";
 			snapshot.forEach(doc => {
-				console.log("Connection already exists");
+				console.log("Connection already exists, as it should");
 				console.log(doc.data());
 				switch(doc.data().Status)
 				{
 					case "Pending":
-						console.log("The previous connection request is pending");
-						response = "The connection request is pending.";
+						console.log("Confirming connection...");
+						docRef.doc(doc.id).update({
+						//console.log(JSON.stringify({
+							Status: "Confirmed",
+							UpdatedDate: firebaseAdmin.FieldValue.serverTimestamp()
+						//}));
+						});
+
+						//Check if opposite connection exists before creating a new connection
+						var oppositeConnectionExists = false;
+						docRef.where('RequesterUid', '==', confirmerUid)
+						.where('ConnectionUid', '==', requesterUid).get().then(
+							snapshot => {
+								snapshot.forEach(existingConnection => {
+									oppositeConnectionExists = true;
+									console.log("Existing opposite connection found with status: " + existingConnection.Status);
+									console.log("Updating existing opposite connection to Confirmed");
+									docRef.doc(doc.id).update({
+									//console.log(JSON.stringify({
+										Status: "Confirmed",
+										UpdatedDate: firebaseAdmin.FieldValue.serverTimestamp()
+									//}));
+									});
+								});
+							}
+						);
+
+						if(!oppositeConnectionExists)
+						{
+							console.log("Creating new opposite connection...");
+							docRef.doc().set({
+							//console.log(JSON.stringify({
+								RequesterUid: confirmerUid,
+								ConnectionUid: requesterUid,
+								Status: "Confirmed",
+								CreatedDate: firebaseAdmin.FieldValue.serverTimestamp(),
+								UpdatedDate: firebaseAdmin.FieldValue.serverTimestamp()
+							//}));
+							});
+							console.log("Connection created.");
+						}
+						console.log("Connection confirmed.");
+						response = "Connection Confirmed!";
 						break;
 					case "Confirmed":
 						console.log("The connection has confirmed the requester's request");
 						response = "You two are already connected.";
 						break;
 					case "Rejected":
-						console.log("The connection has rejected the requester's request");
-						var ninetyDaysAgo = new Date(doc.data().UpdatedDate);
-						ninetyDaysAgo.setDate(ninetyDaysAgo.getDate()-90);
-						if(doc.data().UpdatedDate > ninetyDaysAgo)
-						{
-							response = "The connection request is pending.";
-						}
-						else
-						{
-							db.collection('connections').doc(doc.id).update({
-							//console.log(JSON.stringify({
-								Status: "Pending",
-								UpdatedDate: firebaseAdmin.FieldValue.serverTimestamp()
-							//}));
-							});
-							response = "Sent Connection Request!";
-						}
+						console.log("The connection request has already been rejected");
+						response = "This connection has already been rejected and cannot be confirmed.  If you'd still like to connect with this user, please search their username.";
 						break;
 					case "Blocked":
 						console.log("The requester has blocked this connection");
-						response = "You have to unblock this user before requesting to connect.";
+						response = "Cannot create connection.";
 						break;						
 					default:
 						response = "An unexpected error has occurred."
@@ -250,20 +433,9 @@ function connectUsers(requesterUid, newConnectionUid, callback)
 
 			if(response === "")
 			{
-				console.log("Creating connection...");
-				docRef.doc().set({
-				//console.log(JSON.stringify({
-					RequesterUid: requesterUid,
-					ConnectionUid: newConnectionUid,
-					Status: "Pending",
-					CreatedDate: firebaseAdmin.FieldValue.serverTimestamp(),
-					UpdatedDate: firebaseAdmin.FieldValue.serverTimestamp()
-				//}));
-				});
-				console.log("Connection created.");
-				response = "Sent Connection Request!";
+				console.log("The connection request cannot be found to confirm it");
+				response = "Cannot confirm the request - request was not found.";
 			}
-
 
 			console.log("Connection Response: " + response);
 			callback(response);
@@ -273,6 +445,236 @@ function connectUsers(requesterUid, newConnectionUid, callback)
 		});
 }
 
+function rejectConnection(requesterUid, rejecterUid, callback)
+{
+	if(requesterUid === rejecterUid)
+	{
+		console.log("User trying to reject themself");
+		console.log("Requester UID: " + requesterUid);
+		console.log("Connection UID: " + rejecterUid);
+		callback("Cannot connect to yourself");
+		return;
+	}
+	var docRef = db.collection('connections');
+
+	docRef.where('RequesterUid', '==', requesterUid)
+		.where('ConnectionUid', '==', rejecterUid).get().then(
+		snapshot => {
+			var response = "";
+			snapshot.forEach(doc => {
+				console.log("Connection already exists, as it should");
+				console.log(doc.data());
+				switch(doc.data().Status)
+				{
+					case "Pending":
+						console.log("Rejecting connection...");
+						docRef.doc(doc.id).update({
+						//console.log(JSON.stringify({
+							Status: "Rejected",
+							UpdatedDate: firebaseAdmin.FieldValue.serverTimestamp()
+						//}));
+						});
+						console.log("Connection rejected.");
+						response = "Connection Rejected!";
+						break;
+					case "Confirmed":
+						console.log("The connection has confirmed the requester's request");
+						response = "You two are already connected; this request can't be rejected.";
+						break;
+					case "Rejected":
+						console.log("The connection request has already been rejected");
+						response = "This connection has already been rejected.";
+						break;
+					case "Blocked":
+						console.log("The requester has blocked this connection");
+						response = "Connection is invalid.";
+						break;						
+					default:
+						response = "An unexpected error has occurred."
+						console.log("An unexpected error has occurred while getting the status of this connection: " + doc.data());
+						break;
+				}
+			});
+
+			if(response === "")
+			{
+				console.log("The connection request cannot be found to reject it");
+				response = "Cannot reject the request - request was not found.";
+			}
+
+			console.log("Connection Response: " + response);
+			callback(response);
+		})
+		.catch(err => {
+			console.log('Error getting connection', err);
+		});
+}
+
+function blockConnection(requesterUid, uidToBlock, callback)
+{
+	if(requesterUid === uidToBlock)
+	{
+		console.log("User trying to block themself");
+		console.log("Requester UID: " + requesterUid);
+		console.log("Connection UID: " + uidToBlock);
+		callback("Cannot block yourself");
+		return;
+	}
+	var docRef = db.collection('connections');
+
+	docRef.where('RequesterUid', '==', requesterUid)
+		.where('ConnectionUid', '==', uidToBlock).get().then(
+		snapshot => {
+			var response = "";
+			snapshot.forEach(doc => {
+				console.log("Connection already exists");
+				console.log(doc.data());
+				switch(doc.data().Status)
+				{
+					case "Pending":
+						console.log("Blocking connection...");
+						docRef.doc(doc.id).update({
+						//console.log(JSON.stringify({
+							Status: "Blocked",
+							UpdatedDate: firebaseAdmin.FieldValue.serverTimestamp()
+						//}));
+						});
+						console.log("Connection blocked.");
+						response = "User Blocked.";
+						break;
+					case "Confirmed":
+						console.log("The connection has confirmed the requester's request");
+						console.log("Blocking connection...");
+						docRef.doc(doc.id).update({
+						//console.log(JSON.stringify({
+							Status: "Blocked",
+							UpdatedDate: firebaseAdmin.FieldValue.serverTimestamp()
+						//}));
+						});
+
+						console.log("Deleting opposite connection...");
+						docRef.where('RequesterUid', '==', uidToBlock)
+							.where('ConnectionUid', '==', requesterUid).get().then(
+							snapshot => {
+								snapshot.forEach(doc => {
+									docRef.doc(doc.id).delete().then(function() {
+										console.log("Opposite connection deleted");
+									}).catch(function(error) {
+										console.error("Error removing document: ", error);
+									});
+								});
+							});
+
+						console.log("User blocked.");
+						response = "User blocked.";
+						break;
+					case "Rejected":
+						console.log("Blocking the rejected connection...");
+						docRef.doc(doc.id).update({
+						//console.log(JSON.stringify({
+							Status: "Blocked",
+							UpdatedDate: firebaseAdmin.FieldValue.serverTimestamp()
+						//}));
+						});
+						console.log("Connection blocked.");
+						response = "User Blocked.";
+						break;
+					case "Blocked":
+						console.log("The requester has blocked this connection");
+						response = "User is already blocked.";
+						break;						
+					default:
+						response = "An unexpected error has occurred."
+						console.log("An unexpected error has occurred while getting the status of this connection: " + doc.data());
+						break;
+				}
+			});
+
+			console.log("Deleting opposite pending connections that may exist...");
+			docRef.where('RequesterUid', '==', uidToBlock)
+				.where('ConnectionUid', '==', requesterUid)
+				.where('Status', '==', 'Pending').get().then(
+				snapshot => {
+					snapshot.forEach(doc => {
+						docRef.doc(doc.id).delete().then(function() {
+							console.log("Opposite pending connection deleted");
+						}).catch(function(error) {
+							console.error("Error removing document: ", error);
+						});
+					});
+				});
+
+			console.log("Deleting opposite rejected connections that may exist...");
+			docRef.where('RequesterUid', '==', uidToBlock)
+				.where('ConnectionUid', '==', requesterUid)
+				.where('Status', '==', 'Rejected').get().then(
+				snapshot => {
+					snapshot.forEach(doc => {
+						docRef.doc(doc.id).delete().then(function() {
+							console.log("Opposite rejected connection deleted");
+						}).catch(function(error) {
+							console.error("Error removing document: ", error);
+						});
+					});
+				});
+
+			if(response === "")
+			{
+				console.log("Blocking connection...");
+				docRef.doc().set({
+				//console.log(JSON.stringify({
+					RequesterUid: requesterUid,
+					ConnectionUid: newConnectionUid,
+					Status: "Blocked",
+					CreatedDate: firebaseAdmin.FieldValue.serverTimestamp(),
+					UpdatedDate: firebaseAdmin.FieldValue.serverTimestamp()
+				//}));
+				});
+				console.log("Connection created and blocked.");
+				response = "User blocked.";
+			}
+
+			console.log("Connection Response: " + response);
+			callback(response);
+		})
+		.catch(err => {
+			console.log('Error getting connection', err);
+		});
+}
+
+function getConnectionDetails(uidType, uid, connectionStatus)
+{
+	return new Promise(function(resolve, reject){
+		var docRef = db.collection('connections');
+
+		docRef.where(uidType, '==', uid)
+			.where('Status', '==', connectionStatus).get().then(
+			snapshot => {
+				var response = [];
+				snapshot.forEach(doc => {
+					console.log("Connections found");
+					console.log(doc.data());
+					response.push(doc.data());
+				});
+
+				console.log("Connection Details Response: " + response);
+				resolve(response);
+			})
+			.catch(err => {
+				console.log('Error getting connection details', err);
+				resolve([]);
+			});
+	});
+}
+
+function getSystemWideNotifications(callback)
+{
+	console.log("getSystemWideNotifications()");
+	var systemNotifications = [];
+	systemNotifications.push("This is a test notification");
+	systemNotifications.push("This is a second test notification");
+	callback(systemNotifications);
+}
 
 
 //API Endpoints
@@ -605,6 +1007,213 @@ app.post('/connect', function(req, res) {
 		res.send("An error occurred while processing your request");
 	});
 });
+
+app.post('/confirmConnection', function(req, res) {
+	console.log("POST: /confirmConnection");
+	console.log(req.body);
+	
+	if(req.body.token === undefined)
+	{
+		console.log("Token is Undefined");
+		console.log("Redirect to Error Page");
+		res.send("An error occurred while processing your request");
+		return;
+	}
+
+	decodeUid(req.body.token, function(confirmerUid)
+	{
+		console.log("Confirmer's UID: " + confirmerUid);
+		username = req.body.username;
+	
+		getUserIdFromUsername(username, function(requesterUid)
+		{
+			if(requesterUid)
+			{
+				res.status(200);
+				console.log("Confirming User Connection");
+				//TODO: Connect Users
+
+				confirmConnection(requesterUid, confirmerUid, function(confirmResponse)
+				{
+					res.send(confirmResponse);
+					return;
+				});
+			}
+			else
+			{
+				res.status(404);
+				console.log("Username not Found");
+				res.send("An account with that username was not found.");
+			}
+		});
+	}).catch(function(error) {
+		console.log(error);
+		console.log("Token is bad");
+		console.log("Redirect to Error Page");
+		res.send("An error occurred while processing your request");
+	});
+});
+
+app.post('/rejectConnection', function(req, res) {
+	console.log("POST: /rejectConnection");
+	console.log(req.body);
+	
+	if(req.body.token === undefined)
+	{
+		console.log("Token is Undefined");
+		console.log("Redirect to Error Page");
+		res.send("An error occurred while processing your request");
+		return;
+	}
+
+	decodeUid(req.body.token, function(rejectersUid)
+	{
+		console.log("Requester's UID: " + rejectersUid);
+		username = req.body.username;
+	
+		getUserIdFromUsername(username, function(requestersUid)
+		{
+			if(requestersUid)
+			{
+				res.status(200);
+				console.log("Rejecting User Connection");
+				//TODO: Connect Users
+
+				rejectConnection(requestersUid, rejectersUid, function(rejectResponse)
+				{
+					res.send(rejectResponse);
+					return;
+				});
+			}
+			else
+			{
+				res.status(404);
+				console.log("Username not Found");
+				res.send("An account with that username was not found.");
+			}
+		});
+	}).catch(function(error) {
+		console.log(error);
+		console.log("Token is bad");
+		console.log("Redirect to Error Page");
+		res.send("An error occurred while processing your request");
+	});
+});
+
+app.post('/blockConnection', function(req, res) {
+	console.log("POST: /blockConnection");
+	console.log(req.body);
+	
+	if(req.body.token === undefined)
+	{
+		console.log("Token is Undefined");
+		console.log("Redirect to Error Page");
+		res.send("An error occurred while processing your request");
+		return;
+	}
+
+	decodeUid(req.body.token, function(blockersUid)
+	{
+		console.log("Requester's UID: " + blockersUid);
+		username = req.body.username;
+	
+		getUserIdFromUsername(username, function(uidToBlock)
+		{
+			if(uidToBlock)
+			{
+				res.status(200);
+				console.log("Blocking User Connection");
+				//TODO: Connect Users
+
+				blockConnection(blockersUid, uidToBlock, function(confirmResponse)
+				{
+					res.send(confirmResponse);
+					return;
+				});
+			}
+			else
+			{
+				res.status(404);
+				console.log("Username not Found");
+				res.send("An account with that username was not found.");
+			}
+		});
+	}).catch(function(error) {
+		console.log(error);
+		console.log("Token is bad");
+		console.log("Redirect to Error Page");
+		res.send("An error occurred while processing your request");
+	});
+});
+
+app.post('/getNotifications', function(req, res) {
+	console.log("POST: /getNotifications");
+	console.log(req.body);
+	
+	if(req.body.token === undefined)
+	{
+		console.log("Token is Undefined");
+		console.log("Redirect to Error Page");
+		res.send("An error occurred while processing your request");
+		return;
+	}
+
+	decodeUid(req.body.token, function(userId)
+	{
+		var pendingConnectionNotificationsReady = false;
+		var systemWideNotificationsReady = false;
+		console.log("User's UID: " + userId);
+		var notifications = [];
+	
+		getConnectionDetails("ConnectionUid", userId, "Pending",  function(pendingConnections)
+		{			
+			if(pendingConnections.length > 0)
+			{
+				pendingConnections.forEach(function(item, index, array)
+				{
+					console.log("Adding pending connection to notifications: " + item);
+					getUsernameFromUid(item.RequesterUid, function(requesterUsername)
+					{
+						notifications.push(requesterUsername + " has requested to connected with you.<br><button type=\"button\" onclick=\"confirmConnection(" + requesterUsername + ")\">Confirm" + requesterUsername + "'s request</button><button type=\"button\" onclick=\"rejectConnection(" + requesterUsername + ")\">Reject " + requesterUsername + "'s request</button><button type=\"button\" onclick=\"blockConnection(" + requesterUsername + ")\">Block " + requesterUsername + "</button>");
+					});
+				});
+			}
+			console.log("set pending to true here");
+			pendingConnectionNotificationsReady = true;
+		});
+		getSystemWideNotifications(function(systemNotifications)
+		{
+			console.log("Adding System Notifications");
+			systemNotifications.forEach(notification =>{
+				notifications.push(notification);
+			});
+			console.log("set system to true here");
+			systemWideNotificationsReady = true;
+		});
+
+
+		var i = 0
+		while(!(pendingConnectionNotificationsReady && systemWideNotificationsReady))
+		{
+			i++;
+			function tick(i) {
+				console.log(i);
+			};
+			setTimeout(tick(i), 500 * i);
+		}
+
+		res.status(200);
+		console.log("sending notifications" + JSON.stringify(notifications));
+		res.send(notifications);
+	}).catch(function(error) {
+		console.log(error);
+		console.log("Token is bad");
+		console.log("Redirect to Error Page");
+		res.send("An error occurred while processing your request");
+	});
+});
+
+
 
 //How do I validate this is legit?
 app.post('/updateUser', function(req, res) {

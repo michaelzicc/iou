@@ -6,6 +6,7 @@ app.controller('iouCtrl', function($scope) {
 	cf = this;
 	
 	$scope.loggedIn = false;
+	$scope.showNotifications = false;
 	
 	cf.setLoginStatus = function (status)
 	{
@@ -14,6 +15,15 @@ app.controller('iouCtrl', function($scope) {
 		console.log("Get Login Status " + status);		
 		$scope.$apply();
 		setActionHandlers();
+	}
+
+	cf.getNotifications = function (token)
+	{
+		getNotifications(token, function(getNotificationsResponse) 
+		{
+			$scope.notifications = getNotificationsResponse;
+			$scope.$apply();
+		});
 	}
 });
 
@@ -45,6 +55,7 @@ function mainApp(user)
 			console.log("idToken: " + idToken); 
 			checkUser(idToken);
 			token.value = idToken;
+			cf.getNotifications(idToken);
 		}).catch(function(error) {
 			console.log("error getting token");
 		});

@@ -11,6 +11,14 @@
 
 		<div ng-if="loggedIn">
 			<br />
+			<a ng-click="showNotifications = !showNotifications">Notifications:</a>
+			<br />
+			<div ng-if="showNotifications">
+				<div class="notification" ng-repeat="notification in notifications">
+				{{notification}}
+				</div>
+			</div>
+			<br />
 			
 			<input id="searchField">
 			<button type="button" id="searchButton" onclick="search()">Search by Username</button>
@@ -53,6 +61,7 @@
 	<script src="config.js"></script>
 	<script src="https://www.gstatic.com/firebasejs/4.12.1/firebase.js"></script>
 	<script src="app.js"></script>
+	<script src="notifications.js"></script>
 	<script src="index.js"></script>
 	<script src="search.js"></script>
 </html>
