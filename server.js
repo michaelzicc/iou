@@ -151,25 +151,27 @@ function getUserIdFromUsername(username, callback)
 }
 
 //Checks if UID exists and then gets the associated username, otherwise, it returns false
-function getUsernameFromUid(uid, callback)
+function getUsernameFromUid(uid)
 {
-	var username = false;
-	
-	var docRef = db.collection('users');
-	docRef.where('Uid', '==', uid).get().then(
-		snapshot => {
-			snapshot.forEach(doc => {
-				console.log("User Data: ");
-				console.log(doc.data());
-				username = doc.data().Username;
+	return new Promise(function(resolve){
+		var username = false;
+		
+		var docRef = db.collection('users');
+		docRef.where('Uid', '==', uid).get().then(
+			snapshot => {
+				snapshot.forEach(doc => {
+					console.log("User Data: ");
+					console.log(doc.data());
+					username = doc.data().Username;
+				});
+				console.log("username exists: " + username);
+				return resolve(username);
+			})
+			.catch(err => {
+				console.log('Error getting documents', err);
+				return resolve(false);
 			});
-			console.log("username exists: " + username);
-			callback(username);
-		})
-		.catch(err => {
-			console.log('Error getting documents', err);
-			callback(false);
-		});
+	});
 }
 
 function doesUsernameExist(username, callback)
@@ -644,7 +646,7 @@ function blockConnection(requesterUid, uidToBlock, callback)
 
 function getConnectionDetails(uidType, uid, connectionStatus)
 {
-	return new Promise(function(resolve, reject){
+	return new Promise(function(resolve){
 		var docRef = db.collection('connections');
 
 		docRef.where(uidType, '==', uid)
@@ -658,22 +660,24 @@ function getConnectionDetails(uidType, uid, connectionStatus)
 				});
 
 				console.log("Connection Details Response: " + response);
-				resolve(response);
+				return resolve(response);
 			})
 			.catch(err => {
 				console.log('Error getting connection details', err);
-				resolve([]);
+				return resolve([]);
 			});
 	});
 }
 
 function getSystemWideNotifications(callback)
 {
-	console.log("getSystemWideNotifications()");
-	var systemNotifications = [];
-	systemNotifications.push("This is a test notification");
-	systemNotifications.push("This is a second test notification");
-	callback(systemNotifications);
+	return new Promise(function(resolve){
+		console.log("getSystemWideNotifications()");
+		var systemNotifications = [];
+		systemNotifications.push("This is a test notification");
+		systemNotifications.push("This is a second test notification");
+		return resolve(systemNotifications);
+	});
 }
 
 
@@ -1164,24 +1168,41 @@ app.post('/getNotifications', function(req, res) {
 		var systemWideNotificationsReady = false;
 		console.log("User's UID: " + userId);
 		var notifications = [];
+		var promises = []
 	
-		getConnectionDetails("ConnectionUid", userId, "Pending",  function(pendingConnections)
-		{			
-			if(pendingConnections.length > 0)
-			{
+		var pendingConnectionsPromise = getConnectionDetails("ConnectionUid", userId, "Pending");
+		promises.push(pendingConnectionsPromise);
+		var pendingConnectionPromise2 = pendingConnectionsPromise.then(function(pendingConnections) {
+			return new Promise(function(resolve) {
+				var pendingConnectionPromises = [];
 				pendingConnections.forEach(function(item, index, array)
 				{
 					console.log("Adding pending connection to notifications: " + item);
-					getUsernameFromUid(item.RequesterUid, function(requesterUsername)
+					var getUsernamePromise = getUsernameFromUid(item.RequesterUid);
+					console.log("getUSernamePromise added");
+					pendingConnectionPromises.push(getUsernamePromise);
+					getUsernamePromise.then(function(requesterUsername)
 					{
-						notifications.push(requesterUsername + " has requested to connected with you.<br><button type=\"button\" onclick=\"confirmConnection(" + requesterUsername + ")\">Confirm" + requesterUsername + "'s request</button><button type=\"button\" onclick=\"rejectConnection(" + requesterUsername + ")\">Reject " + requesterUsername + "'s request</button><button type=\"button\" onclick=\"blockConnection(" + requesterUsername + ")\">Block " + requesterUsername + "</button>");
+						console.log("Pending connection username is " + requesterUsername);
+						if(requesterUsername)
+						{
+							notifications.push(requesterUsername + " has requested to connected with you.<br><button type=\"button\" onclick=\"confirmConnection(this, '" + requesterUsername + "')\">Confirm " + requesterUsername + "'s request</button><button type=\"button\" onclick=\"rejectConnection(this, '" + requesterUsername + "')\">Reject " + requesterUsername + "'s request</button><button type=\"button\" onclick=\"blockConnection(this, '" + requesterUsername + "')\">Block " + requesterUsername + "</button>");
+							console.log("added pending connection");
+						}
 					});
 				});
-			}
-			console.log("set pending to true here");
-			pendingConnectionNotificationsReady = true;
+				Promise.all(pendingConnectionPromises).then(function() 
+				{
+					console.log("set pending to true here");
+					pendingConnectionNotificationsReady = true;
+					return resolve();
+				});
+			});
 		});
-		getSystemWideNotifications(function(systemNotifications)
+		promises.push(pendingConnectionPromise2);
+		var systemNotificationsPromise = getSystemWideNotifications();
+		promises.push(systemNotificationsPromise);
+		systemNotificationsPromise.then(function(systemNotifications)
 		{
 			console.log("Adding System Notifications");
 			systemNotifications.forEach(notification =>{
@@ -1192,19 +1213,16 @@ app.post('/getNotifications', function(req, res) {
 		});
 
 
-		var i = 0
-		while(!(pendingConnectionNotificationsReady && systemWideNotificationsReady))
-		{
-			i++;
-			function tick(i) {
-				console.log(i);
-			};
-			setTimeout(tick(i), 500 * i);
-		}
+		//while(!(pendingConnectionNotificationsReady && systemWideNotificationsReady))
+		//{}
 
-		res.status(200);
-		console.log("sending notifications" + JSON.stringify(notifications));
-		res.send(notifications);
+		Promise.all(promises).then(function()
+		{
+			res.status(200);
+			console.log("sending notifications" + JSON.stringify(notifications));
+			res.send(notifications);
+		});
+
 	}).catch(function(error) {
 		console.log(error);
 		console.log("Token is bad");

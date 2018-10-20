@@ -19,7 +19,7 @@ app.controller('iouCtrl', function($scope) {
 
 	cf.getNotifications = function (token)
 	{
-		getNotifications(token, function(getNotificationsResponse) 
+		getNotifications(token).then(function(getNotificationsResponse) 
 		{
 			$scope.notifications = getNotificationsResponse;
 			$scope.$apply();
@@ -27,6 +27,12 @@ app.controller('iouCtrl', function($scope) {
 	}
 });
 
+angular.module('iouApp')
+    .filter('to_trusted', ['$sce', function($sce){
+        return function(text) {
+            return $sce.trustAsHtml(text);
+        };
+    }]);
 
 
 function mainApp(user)
